@@ -2,6 +2,7 @@ import { injectable, inject } from "inversify";
 import { TYPES } from "../types";
 import { Request } from "express";
 import { Services } from "../services/services";
+import Alumno from "../models/alumno.model";
 
 @injectable()
 export class Controllers {
@@ -70,5 +71,44 @@ export class Controllers {
     } catch (error) {
       throw error;
     }
+  };
+
+  public getStudents = (req: Request) => {
+    try {
+      if (!req?.params?.idGrade) {
+        throw { message: "Missing parameters" };
+      }
+
+      return this.service.getStudentsByGrade(req?.params?.idGrade);
+    } catch (error) {
+      throw error;
+    }
+  };
+
+  public manageStudents = (req: Request) => {
+    return new Promise(async (resolve, reject) => {
+      try {
+        if (!req?.body) {
+          throw { message: "Missing parameters" };
+        }
+
+        const studentsData: Array<string[]> = req?.body?.excelData;
+        const gradeId = req?.body?.selectedGrade;
+        await this.service.deleteStudentsByGrade(gradeId);
+        const arrayPromises: Promise<Alumno>[] = [];
+        for (const iterator of studentsData) {
+          const student: Partial<Alumno> = {
+            nombre: iterator[0],
+            cedula: iterator[1],
+            curso_id: gradeId,
+          };
+          arrayPromises.push(this.service.createStudent(student));
+        }
+        await Promise.all(arrayPromises);
+        resolve({ status: true });
+      } catch (error) {
+        reject(error);
+      }
+    });
   };
 }

@@ -27,9 +27,17 @@ export class Routes {
       "/getGrades/:idScholl",
       asyncHandler(this.controllers.getGrades)
     );
+    this._router.get(
+      "/getStudents/:idGrade",
+      asyncHandler(this.controllers.getStudents)
+    );
     this._router.post(
       "/createGrade",
       asyncHandler(this.controllers.createGrade)
+    );
+    this._router.post(
+      "/manageStudents",
+      asyncHandler(this.controllers.manageStudents)
     );
   }
 
