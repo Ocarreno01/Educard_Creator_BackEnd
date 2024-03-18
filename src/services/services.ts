@@ -2,6 +2,7 @@ import { injectable } from "inversify";
 import Colegio from "../models/colegio.model";
 import Curso from "../models/curso.model";
 import Alumno from "../models/alumno.model";
+import Foto from "../models/fotos.model";
 
 @injectable()
 export class Services {
@@ -41,11 +42,31 @@ export class Services {
     });
   }
 
+  public async getPhotosByGrade(idGrade: string): Promise<Foto[]> {
+    return await Foto.findAll({
+      where: {
+        curso_id: idGrade,
+      },
+    });
+  }
+
   public async deleteStudentsByGrade(gredeId: string): Promise<number> {
     return await Alumno.destroy({
       where: {
         curso_id: gredeId,
       },
     });
+  }
+
+  public async deletePhotosByGrade(gredeId: string): Promise<number> {
+    return await Foto.destroy({
+      where: {
+        curso_id: gredeId,
+      },
+    });
+  }
+
+  public async createPhoto(photoData: Partial<Foto>): Promise<Foto> {
+    return await Foto.create(photoData);
   }
 }

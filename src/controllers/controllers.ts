@@ -3,6 +3,9 @@ import { TYPES } from "../types";
 import { Request } from "express";
 import { Services } from "../services/services";
 import Alumno from "../models/alumno.model";
+import AdmZip from "adm-zip";
+import fs from "fs";
+import Foto from "../models/fotos.model";
 
 @injectable()
 export class Controllers {
@@ -85,6 +88,26 @@ export class Controllers {
     }
   };
 
+  public getPhotos = async (req: Request) => {
+    try {
+      if (!req?.params?.idGrade) {
+        throw { message: "Missing parameters" };
+      }
+      const images = await this.service.getPhotosByGrade(req?.params?.idGrade);
+      images.forEach((photos: any) => {
+        const imagen = photos.dataValues;
+        const TYPED_ARRAY: any = new Uint8Array(imagen.imagen);
+        const STRING_CHAR = String.fromCharCode.apply(null, TYPED_ARRAY);
+        const base64String = btoa(STRING_CHAR);
+        const dataURL = "data:image/jpeg;base64," + base64String;
+        imagen.imagen = dataURL;
+      });
+      return images;
+    } catch (error) {
+      throw error;
+    }
+  };
+
   public manageStudents = (req: Request) => {
     return new Promise(async (resolve, reject) => {
       try {
@@ -106,6 +129,96 @@ export class Controllers {
         }
         await Promise.all(arrayPromises);
         resolve({ status: true });
+      } catch (error) {
+        reject(error);
+      }
+    });
+  };
+
+  public uploadPhotos = (req: Request) => {
+    return new Promise(async (resolve, reject) => {
+      try {
+        if (!req?.body?.base64 || !req?.body?.gradeId) {
+          throw { message: "Missing parameters" };
+        }
+        const base64Data = req.body.base64;
+        const gradeId = req.body.gradeId;
+        const zipData = Buffer.from(
+          base64Data.replace(/^data:application\/zip;base64,/, ""),
+          "base64"
+        );
+        fs.writeFileSync("temp.zip", zipData);
+        const zip = new AdmZip("temp.zip");
+        zip.extractAllTo("images", true);
+        const imageFiles = fs.readdirSync("images");
+        const images = imageFiles.filter((file) => file.endsWith(".jpg"));
+        const validation = await this.validatePhotos(images, gradeId);
+        if (validation.status) {
+          await this.saveImages(images, gradeId);
+          fs.rmSync("images", { recursive: true });
+          resolve({ status: true });
+        } else {
+          fs.rmSync("images", { recursive: true });
+          resolve({ status: validation.status, message: validation.error });
+        }
+      } catch (error) {
+        reject(error);
+      }
+    });
+  };
+
+  private validatePhotos = (images: string[], gradeId: string) => {
+    return new Promise<{ status: boolean; error?: string }>(async (resolve) => {
+      const response = { status: false, error: "" };
+      const students = await this.service.getStudentsByGrade(gradeId);
+
+      const documentsList = students.map((x: any) => x.toJSON().cedula);
+      const photoImagesList = images.map((y: any) => y.replace(/\.[^.]+$/, ""));
+      console.log("students", documentsList);
+      console.log("images", photoImagesList);
+      if (documentsList.length === photoImagesList.length) {
+        const diferences = [];
+        for (let i = 0; i < documentsList.length; i++) {
+          const elemento = documentsList[i];
+
+          // Verifica si el elemento actual no está presente en el segundo array
+          if (!photoImagesList.includes(elemento)) {
+            diferences.push(elemento);
+          }
+        }
+
+        if (diferences.length > 0) {
+          response.error =
+            "Por favor valide la informacion de los siguientes documentos: " +
+            diferences.join(" - ");
+        } else {
+          response.status = true;
+        }
+      } else {
+        response.error =
+          "Por favor valide que la cantidad de fotografias y de alumnos es la misma";
+      }
+      resolve(response);
+    });
+  };
+
+  private saveImages = (images: string[], gradeId: string) => {
+    return new Promise<void>(async (resolve, reject) => {
+      try {
+        await this.service.deletePhotosByGrade(gradeId);
+        const arrayPromises = [];
+        for (const file of images) {
+          const data = fs.readFileSync(`images/${file}`);
+          const photoData: Partial<Foto> = {
+            imagen: data,
+            curso_id: Number(gradeId),
+            nombre: file.replace(/\.[^.]+$/, ""),
+          };
+          console.log("photoData", photoData);
+          arrayPromises.push(this.service.createPhoto(photoData));
+        }
+        await Promise.all(arrayPromises);
+        resolve();
       } catch (error) {
         reject(error);
       }

@@ -31,6 +31,10 @@ export class Routes {
       "/getStudents/:idGrade",
       asyncHandler(this.controllers.getStudents)
     );
+    this._router.get(
+      "/getPhotos/:idGrade",
+      asyncHandler(this.controllers.getPhotos)
+    );
     this._router.post(
       "/createGrade",
       asyncHandler(this.controllers.createGrade)
@@ -38,6 +42,10 @@ export class Routes {
     this._router.post(
       "/manageStudents",
       asyncHandler(this.controllers.manageStudents)
+    );
+    this._router.post(
+      "/uploadPhotos",
+      asyncHandler(this.controllers.uploadPhotos)
     );
   }
 
